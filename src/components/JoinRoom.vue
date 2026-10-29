@@ -3,16 +3,10 @@
     <h2>Join Room</h2>
 
     <input
-      v-model="roomCode"
+      v-model="roomCodeInput"
       placeholder="Enter Room Code"
       class="room-input"
     />
-
-    <label class="label">Pick Your Letter:</label>
-    <select v-model="playerLetter" class="letter-select">
-      <option value="X">X</option>
-      <option value="O">O</option>
-    </select>
 
     <button @click="joinRoom" class="start-btn">Join Game</button>
     <button @click="$emit('go-home')" class="back-btn">⬅️ Back</button>
@@ -26,18 +20,19 @@ import { doc, getDoc } from "firebase/firestore";
 export default {
   data() {
     return {
-      roomCode: "",
-      playerLetter: "X",
+      roomCodeInput: "",
     };
   },
   methods: {
     async joinRoom() {
-      if (!this.roomCode) {
+      const formattedCode = this.roomCodeInput.trim().toUpperCase();
+
+      if (!formattedCode) {
         alert("Please enter a room code.");
         return;
       }
 
-      const roomRef = doc(db, "rooms", this.roomCode);
+      const roomRef = doc(db, "rooms", formattedCode);
       const roomSnap = await getDoc(roomRef);
 
       if (!roomSnap.exists()) {
@@ -45,9 +40,17 @@ export default {
         return;
       }
 
+      const roomData = roomSnap.data();
+      
+      // Auto-assign the opposite letter of creator, or default to O
+      let assignedLetter = "O";
+      if (roomData.creatorLetter) {
+        assignedLetter = roomData.creatorLetter === "X" ? "O" : "X";
+      }
+
       this.$emit("start-game", {
-        roomCode: this.roomCode,
-        playerLetter: this.playerLetter,
+        roomCode: formattedCode,
+        playerLetter: assignedLetter,
       });
     },
   },
@@ -78,20 +81,7 @@ h2 {
   border-radius: 8px;
   margin-bottom: 20px;
   width: 220px;
-}
-
-.label {
-  font-size: 18px;
-  margin-bottom: 8px;
-}
-
-.letter-select {
-  padding: 10px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  margin-bottom: 20px;
-  width: 120px;
+  text-transform: uppercase;
 }
 
 .start-btn {
@@ -108,6 +98,7 @@ h2 {
 .start-btn:hover {
   background: #444;
 }
+
 .back-btn {
   position: absolute;
   top: 20px;

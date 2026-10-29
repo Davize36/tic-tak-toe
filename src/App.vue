@@ -1,13 +1,15 @@
 <template>
   <div>
-    <CreateRoom v-if="page === 'create'" @start-game="startGame" @go-home="page = 'home'"/>
-    <JoinRoom v-if="page === 'join'" @start-game="startGame" @go-home="page = 'home'"/>
+    <CreateRoom v-if="page === 'create'" @start-game="startGame" @go-home="goHome"/>
+    <JoinRoom v-if="page === 'join'" @start-game="startGame" @go-home="goHome"/>
     <GameBoard
       v-if="page === 'game'"
       :roomCode="roomCode"
       :playerLetter="playerLetter"
+      @go-home="goHome"
     />
-    <LocalGameBoard v-if="page === 'local'" />
+    <LocalGameBoard v-if="page === 'local'" @go-home="goHome" />
+    
     <div v-if="page === 'home'" class="home-container">
       <h1 class="title">Tic Tac Toe Multiplayer</h1>
       <div class="button-group">
@@ -15,7 +17,7 @@
         <button @click="page = 'join'">Join Room</button>
       </div>
 
-      <h3 class="or-text">— or —</h3>
+      <h3 class="or-text">- or -</h3>
 
       <div class="button-group">
         <button @click="page = 'local'" class="local-btn">
@@ -41,11 +43,35 @@ export default {
       playerLetter: "",
     };
   },
+  mounted() {
+    // Restore session on refresh if stored
+    const savedRoom = sessionStorage.getItem("ttt_roomCode");
+    const savedLetter = sessionStorage.getItem("ttt_playerLetter");
+
+    if (savedRoom && savedLetter) {
+      this.roomCode = savedRoom;
+      this.playerLetter = savedLetter;
+      this.page = "game";
+    }
+  },
   methods: {
     startGame({ roomCode, playerLetter }) {
       this.roomCode = roomCode;
       this.playerLetter = playerLetter;
       this.page = "game";
+
+      // Save session to browser storage
+      sessionStorage.setItem("ttt_roomCode", roomCode);
+      sessionStorage.setItem("ttt_playerLetter", playerLetter);
+    },
+    goHome() {
+      this.page = "home";
+      this.roomCode = "";
+      this.playerLetter = "";
+
+      // Clear session when intentionally leaving
+      sessionStorage.removeItem("ttt_roomCode");
+      sessionStorage.removeItem("ttt_playerLetter");
     },
   },
 };
@@ -87,6 +113,7 @@ export default {
 .button-group button:hover {
   background: #444;
 }
+
 .or-text {
   margin: 30px 0 20px;
   font-size: 20px;

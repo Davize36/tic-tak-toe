@@ -35,6 +35,10 @@ export default {
         winner: null,
         isDraw: false,
         winningCells: [],
+        scores: {
+          X: 0,
+          O: 0,
+        },
       });
 
       this.$emit("start-game", {
@@ -108,6 +112,7 @@ h2 {
 .start-btn:hover {
   background: #444;
 }
+
 .back-btn {
   position: absolute;
   top: 20px;

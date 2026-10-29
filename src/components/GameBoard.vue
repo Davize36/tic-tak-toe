@@ -1,6 +1,21 @@
 <template>
   <div class="container">
+    <button @click="$emit('go-home')" class="leave-btn">⬅️ Leave Room</button>
+
     <h2>Room Code: {{ roomCode }}</h2>
+
+    <!-- Scoreboard UI -->
+    <div class="scoreboard">
+      <div class="score-card" :class="{ active: currentPlayer === 'X' }">
+        <span class="label">Player X</span>
+        <span class="value">{{ scores.X }}</span>
+      </div>
+      <div class="score-card" :class="{ active: currentPlayer === 'O' }">
+        <span class="label">Player O</span>
+        <span class="value">{{ scores.O }}</span>
+      </div>
+    </div>
+
     <h3 v-if="!winner && !isDraw">Current Turn: {{ currentPlayer }}</h3>
     <h3>You are: {{ playerLetter }}</h3>
 
@@ -18,13 +33,13 @@
     <p v-if="winner"><strong>{{ winner }} wins!</strong></p>
     <p v-else-if="isDraw"><strong>It’s a draw!</strong></p>
 
-    <button @click="resetGame" v-if="winner || isDraw">New Match</button>
+    <button @click="resetGame" v-if="winner || isDraw" class="reset-btn">New Match</button>
   </div>
 </template>
 
 <script>
 import { db } from "../firebase";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, increment } from "firebase/firestore";
 
 export default {
   props: ["roomCode", "playerLetter"],
@@ -35,9 +50,14 @@ export default {
       winner: null,
       isDraw: false,
       winningCells: [],
+      scores: {
+        X: 0,
+        O: 0,
+      },
       clickSound: new Audio("/sounds/play.mp3"),
       winSound: new Audio("/sounds/win.wav"),
       drawSound: new Audio("/sounds/draw.wav"),
+      unsubscribe: null,
     };
   },
   computed: {
@@ -50,19 +70,39 @@ export default {
       if (this.isMyTurn && !this.board[index] && !this.winner && !this.isDraw) {
         this.clickSound.play();
 
-        const roomRef = doc(db, "rooms", this.roomCode);
         const newBoard = [...this.board];
         newBoard[index] = this.currentPlayer;
 
-        const nextPlayer = this.currentPlayer === "X" ? "O" : "X";
+        // Check for win or draw immediately on move
+        const winInfo = this.getWinningCombo(newBoard);
+        const roomRef = doc(db, "rooms", this.roomCode);
 
-        await updateDoc(roomRef, {
-          board: newBoard,
-          currentPlayer: nextPlayer,
-        });
+        if (winInfo) {
+          // Win detected: update board, winner, winningCells, and increment score ONCE
+          await updateDoc(roomRef, {
+            board: newBoard,
+            winner: winInfo.winner,
+            winningCells: winInfo.combo,
+            [`scores.${winInfo.winner}`]: increment(1),
+          });
+        } else if (newBoard.every((cell) => cell)) {
+          // Draw detected
+          await updateDoc(roomRef, {
+            board: newBoard,
+            isDraw: true,
+          });
+        } else {
+          // Normal move: switch turns
+          const nextPlayer = this.currentPlayer === "X" ? "O" : "X";
+          await updateDoc(roomRef, {
+            board: newBoard,
+            currentPlayer: nextPlayer,
+          });
+        }
       }
     },
-    checkWinner() {
+
+    getWinningCombo(boardState) {
       const wins = [
         [0, 1, 2],
         [3, 4, 5],
@@ -77,23 +117,16 @@ export default {
       for (const combo of wins) {
         const [a, b, c] = combo;
         if (
-          this.board[a] &&
-          this.board[a] === this.board[b] &&
-          this.board[a] === this.board[c]
+          boardState[a] &&
+          boardState[a] === boardState[b] &&
+          boardState[a] === boardState[c]
         ) {
-          this.winner = this.board[a];
-          this.winningCells = combo;
-          this.winSound.play();
-          return;
+          return { winner: boardState[a], combo };
         }
       }
+      return null;
     },
-    checkDraw() {
-      if (!this.winner && this.board.every((cell) => cell)) {
-        this.isDraw = true;
-        this.drawSound.play();
-      }
-    },
+
     async resetGame() {
       const roomRef = doc(db, "rooms", this.roomCode);
       await updateDoc(roomRef, {
@@ -104,6 +137,7 @@ export default {
         winningCells: [],
       });
     },
+
     cellClass(cell) {
       if (cell === "X") return "x-cell";
       if (cell === "O") return "o-cell";
@@ -113,29 +147,93 @@ export default {
   mounted() {
     const roomRef = doc(db, "rooms", this.roomCode);
 
-    onSnapshot(roomRef, (docSnap) => {
+    this.unsubscribe = onSnapshot(roomRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        this.board = data.board;
-        this.currentPlayer = data.currentPlayer;
+        this.board = data.board || Array(9).fill("");
+        this.currentPlayer = data.currentPlayer || "X";
 
-        this.winner = null;
-        this.isDraw = false;
-        this.winningCells = [];
+        if (data.scores) {
+          this.scores = data.scores;
+        }
 
-        this.checkWinner();
-        this.checkDraw();
+        // Play audio when win or draw state transitions in Firestore
+        if (!this.winner && data.winner) {
+          this.winSound.play();
+        } else if (!this.isDraw && data.isDraw) {
+          this.drawSound.play();
+        }
+
+        this.winner = data.winner || null;
+        this.isDraw = data.isDraw || false;
+        this.winningCells = data.winningCells || [];
       }
     });
+  },
+  unmounted() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
   },
 };
 </script>
 
 <style scoped>
-/* same CSS as yours — untouched */
 .container {
   text-align: center;
   font-family: sans-serif;
+  position: relative;
+  padding-top: 40px;
+}
+
+.leave-btn {
+  position: absolute;
+  top: 10px;
+  left: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  border: none;
+  background: #ccc;
+  color: #333;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.leave-btn:hover {
+  background: #bbb;
+}
+
+.scoreboard {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin: 15px auto;
+  padding: 10px 20px;
+  background: #f0f0f0;
+  border-radius: 10px;
+  max-width: 260px;
+}
+
+.score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.score-card.active {
+  font-weight: bold;
+  color: #007acc;
+}
+
+.label {
+  font-size: 14px;
+  color: #666;
+}
+
+.value {
+  font-size: 20px;
+  font-weight: bold;
 }
 
 .board {
@@ -173,12 +271,40 @@ export default {
   color: #00d1b2;
 }
 
+.x-cell,
+.o-cell {
+  animation: pop 0.25s ease;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  80% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .winner {
   background: #ffeaa7;
   animation: flash 0.6s infinite alternate;
 }
 
-button {
+@keyframes flash {
+  from {
+    background-color: #ffeaa7;
+  }
+  to {
+    background-color: #f6e58d;
+  }
+}
+
+.reset-btn {
   padding: 10px 20px;
   font-size: 16px;
   margin-top: 20px;
@@ -189,16 +315,7 @@ button {
   cursor: pointer;
 }
 
-button:hover {
+.reset-btn:hover {
   background: #333;
-}
-
-@keyframes flash {
-  from {
-    background-color: #ffeaa7;
-  }
-  to {
-    background-color: #f6e58d;
-  }
 }
 </style>
