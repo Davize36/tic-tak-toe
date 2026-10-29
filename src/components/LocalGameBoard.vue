@@ -1,41 +1,49 @@
 <template>
-  <div class="container">
-    <button @click="$emit('go-home')" class="back-btn">⬅️ Back</button>
-    <h2>Local Multiplayer</h2>
+  <div class="game-wrapper">
+    <div class="glass-card">
+      <button @click="$emit('go-home')" class="back-btn">⬅ Leave</button>
 
-    <!-- Scoreboard UI -->
-    <div class="scoreboard">
-      <div class="score-card" :class="{ active: currentPlayer === 'X' }">
-        <span class="label">Player X</span>
-        <span class="value">{{ scores.X }}</span>
+      <h2>Local Match</h2>
+
+      <!-- Scoreboard UI -->
+      <div class="scoreboard">
+        <div class="score-card x-card" :class="{ active: currentPlayer === 'X' }">
+          <span class="label">PLAYER X</span>
+          <span class="value">{{ scores.X }}</span>
+        </div>
+        <div class="score-card o-card" :class="{ active: currentPlayer === 'O' }">
+          <span class="label">PLAYER O</span>
+          <span class="value">{{ scores.O }}</span>
+        </div>
       </div>
-      <div class="score-card" :class="{ active: currentPlayer === 'O' }">
-        <span class="label">Player O</span>
-        <span class="value">{{ scores.O }}</span>
+
+      <div class="status-banner">
+        <span v-if="!winner && !isDraw">Turn: <strong :class="currentPlayer.toLowerCase()">{{ currentPlayer }}</strong></span>
       </div>
+
+      <!-- Grid Board -->
+      <div class="board">
+        <div
+          v-for="(cell, index) in board"
+          :key="index"
+          :class="['cell', cellClass(cell), { winner: winningCells.includes(index) }]"
+          @click="makeMove(index)"
+        >
+          {{ cell }}
+        </div>
+      </div>
+
+      <div v-if="winner" class="result-text">
+        🎉 Player <span>{{ winner }}</span> Wins!
+      </div>
+      <div v-else-if="isDraw" class="result-text">
+        🤝 It’s a Draw!
+      </div>
+
+      <button @click="resetGame" v-if="winner || isDraw" class="reset-btn">
+        Next Round
+      </button>
     </div>
-
-    <h3 v-if="!winner && !isDraw">Current Turn: {{ currentPlayer }}</h3>
-
-    <div class="board">
-      <div
-        v-for="(cell, index) in board"
-        :key="index"
-        :class="['cell', cellClass(cell), { winner: winningCells.includes(index) }]"
-        @click="makeMove(index)"
-      >
-        {{ cell }}
-      </div>
-    </div>
-
-    <p v-if="winner">
-      <strong>{{ winner }} wins!</strong>
-    </p>
-    <p v-else-if="isDraw">
-      <strong>It’s a draw!</strong>
-    </p>
-
-    <button @click="resetGame" v-if="winner || isDraw">New Match</button>
   </div>
 </template>
 
@@ -48,10 +56,7 @@ export default {
       winner: null,
       isDraw: false,
       winningCells: [],
-      scores: {
-        X: 0,
-        O: 0,
-      },
+      scores: { X: 0, O: 0 },
       clickSound: new Audio("/sounds/play.mp3"),
       winSound: new Audio("/sounds/win.wav"),
       drawSound: new Audio("/sounds/draw.wav"),
@@ -60,7 +65,7 @@ export default {
   methods: {
     makeMove(index) {
       if (!this.board[index] && !this.winner && !this.isDraw) {
-        this.clickSound.play(); // 🔊 move sound
+        this.clickSound.play();
 
         this.board[index] = this.currentPlayer;
         this.checkWinner();
@@ -73,14 +78,9 @@ export default {
     },
     checkWinner() {
       const wins = [
-        [0, 1, 2],
-        [3, 4, 5],
-        [6, 7, 8],
-        [0, 3, 6],
-        [1, 4, 7],
-        [2, 5, 8],
-        [0, 4, 8],
-        [2, 4, 6],
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6],
       ];
 
       for (const combo of wins) {
@@ -92,8 +92,8 @@ export default {
         ) {
           this.winner = this.board[a];
           this.winningCells = combo;
-          this.scores[this.winner]++; // Increment local winner score
-          this.winSound.play(); // 🔊 win sound
+          this.scores[this.winner]++;
+          this.winSound.play();
           break;
         }
       }
@@ -101,7 +101,7 @@ export default {
     checkDraw() {
       if (!this.winner && this.board.every((cell) => cell)) {
         this.isDraw = true;
-        this.drawSound.play(); // 🔊 draw sound
+        this.drawSound.play();
       }
     },
     resetGame() {
@@ -121,87 +121,133 @@ export default {
 </script>
 
 <style scoped>
-.container {
+.game-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100dvh;
+  padding: 16px;
+  width: 100%;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 24px 18px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   text-align: center;
-  font-family: sans-serif;
-  background: #fdfdfd;
-  padding: 30px;
-  min-height: 100vh;
+  width: 100%;
+  max-width: 380px;
   position: relative;
 }
 
 .back-btn {
   position: absolute;
-  top: 20px;
-  left: 20px;
-  padding: 8px 16px;
-  font-size: 14px;
-  border: none;
-  background: #ccc;
-  color: #333;
-  border-radius: 6px;
+  top: 16px;
+  left: 16px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
   cursor: pointer;
   transition: 0.2s ease;
-  margin-top: 0;
 }
 
 .back-btn:hover {
-  background: #bbb;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 800;
+  margin-top: 12px;
+  margin-bottom: 16px;
 }
 
 .scoreboard {
   display: flex;
-  justify-content: center;
-  gap: 40px;
-  margin: 15px auto;
-  padding: 10px 20px;
-  background: #f0f0f0;
-  border-radius: 10px;
-  max-width: 260px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .score-card {
+  flex: 1;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  align-items: center;
 }
 
-.score-card.active {
-  font-weight: bold;
-  color: #007acc;
+.score-card.active.x-card {
+  border-color: rgba(244, 63, 94, 0.5);
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.25);
+}
+
+.score-card.active.o-card {
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
 }
 
 .label {
-  font-size: 14px;
-  color: #666;
+  font-size: 10px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
 }
 
 .value {
   font-size: 20px;
-  font-weight: bold;
+  font-weight: 800;
 }
+
+.x-card .value { color: #f43f5e; }
+.o-card .value { color: #38bdf8; }
+
+.status-banner {
+  font-size: 13px;
+  color: #cbd5e1;
+  margin-bottom: 16px;
+}
+
+.x { color: #f43f5e; }
+.o { color: #38bdf8; }
 
 .board {
   display: grid;
-  grid-template-columns: repeat(3, 100px);
-  gap: 8px;
-  justify-content: center;
-  margin: 20px auto;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .cell {
-  width: 100px;
-  height: 100px;
-  font-size: 48px;
-  background: #f5f5f5;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: clamp(28px, 8vw, 38px);
+  font-weight: 800;
   cursor: pointer;
-  border-radius: 12px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   user-select: none;
-  transition: transform 0.15s ease;
+  transition: all 0.2s ease;
+}
+
+.cell:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.02);
 }
 
 .cell:active {
@@ -209,58 +255,51 @@ export default {
 }
 
 .x-cell {
-  color: #ff3860;
+  color: #f43f5e;
+  text-shadow: 0 0 16px rgba(244, 63, 94, 0.6);
+  animation: pop 0.25s ease;
 }
 
 .o-cell {
-  color: #00d1b2;
-}
-
-.x-cell,
-.o-cell {
+  color: #38bdf8;
+  text-shadow: 0 0 16px rgba(56, 189, 248, 0.6);
   animation: pop 0.25s ease;
 }
 
 @keyframes pop {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  80% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-  }
+  0% { transform: scale(0); opacity: 0; }
+  80% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .winner {
-  background: #ffeaa7;
-  animation: flash 0.6s infinite alternate;
+  background: rgba(250, 204, 21, 0.15) !important;
+  border-color: rgba(250, 204, 21, 0.5) !important;
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.3);
 }
 
-@keyframes flash {
-  from {
-    background-color: #ffeaa7;
-  }
-  to {
-    background-color: #f6e58d;
-  }
-}
-
-button {
-  padding: 10px 20px;
+.result-text {
   font-size: 16px;
-  margin-top: 20px;
-  border: none;
-  background: #222;
-  color: #fff;
-  border-radius: 6px;
-  cursor: pointer;
+  font-weight: 800;
+  margin-bottom: 14px;
 }
 
-button:hover {
-  background: #333;
+.reset-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(6, 182, 212, 0.35);
+  transition: 0.2s ease;
+}
+
+.reset-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px rgba(6, 182, 212, 0.5);
 }
 </style>
